@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">LR6_OMR</string>
+    <string name="show_favorites">Показать избранное</string>
+    <string name="show_all_songs">Показать все песни</string>
+    <string name="show_albums">Показать альбомы</string>
+    <string name="show_artists">Показать исполнителей</string>
+    <string name="show_main">Главное окно</string>
+</resources>
