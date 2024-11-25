@@ -112,6 +112,31 @@
         android:textColor="#FFFFFF"
         android:textColorLink="#000000"
         android:textSize="18sp" />
+    <Button
+        android:id="@+id/btnSaveCSV"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/buttonAdd"
+        android:clickable="true"
+        android:fontFamily="@font/rubik_mono_one"
+        android:text="Сохранить .csv"
+        android:textAllCaps="true"
+        android:textColor="#FFFFFF"
+        android:textColorLink="#000000"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/btnOpenCSV"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/btnSaveCSV"
+        android:clickable="true"
+        android:fontFamily="@font/rubik_mono_one"
+        android:text="Открыть .csv"
+        android:textAllCaps="true"
+        android:textColor="#FFFFFF"
+        android:textColorLink="#000000"
+        android:textSize="18sp" />
 
 </RelativeLayout>
 

@@ -1,5 +1,6 @@
 package com.example.lr6_omr
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -24,9 +25,21 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.DialogInterface
 import android.graphics.Color
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.text.InputType
+import android.util.Log
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.io.File
 import java.io.FileWriter
+import androidx.core.content.FileProvider
+import java.io.BufferedReader
+import java.io.FileReader
+import java.io.IOException
+import java.io.InputStreamReader
+
 
 class MainActivity : AppCompatActivity() {
     var allSongs = mutableListOf<Song>()
@@ -44,6 +57,14 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(findViewById(R.id.toolbar))
         val buttonAdd = findViewById<Button>(R.id.buttonAdd)
         buttonAdd.setOnClickListener { addSong() }
+
+        val buttonSaveCSV = findViewById<Button>(R.id.btnSaveCSV)
+        buttonSaveCSV.setOnClickListener { saveDataToCSV(this) }
+
+        val buttonOpenCSV = findViewById<Button>(R.id.btnOpenCSV)
+        buttonOpenCSV.setOnClickListener { openCSVFile(this) }
+
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -108,66 +129,145 @@ class MainActivity : AppCompatActivity() {
     private fun saveData() {
         saveDataToCSV(this)
         saveToPDF(this)
-        saveToSharedPreferences(this)
+//        saveToSharedPreferences(this)
     }
 
+//    fun saveDataToCSV(context: Context) {
+//        val csvFile = File(context.filesDir, "*.csv")
+//        FileWriter(csvFile).use { writer ->
+//            writer.appendLine("№;name;author;album;isFavorite")
+//            for ((index, song) in allSongs.withIndex()) {
+//                writer.appendLine("${index + 1};${song.title};${song.artist};${song.album};${song.isFavorite}")
+//            }
+//        }
+//    }
+
+//    fun saveDataToCSV(context: Context) {
+//        val builder = AlertDialog.Builder(context)
+//        val input = EditText(context)
+//        input.inputType = InputType.TYPE_CLASS_TEXT
+//        input.hint = "Введите имя файла"
+//
+//        builder.setView(input)
+//            .setTitle("Сохранение в CSV")
+//            .setPositiveButton("Сохранить") { _, _ ->
+//                val fileName = input.text.toString().trim()
+//                if (fileName.isEmpty()) {
+//                    Toast.makeText(context, "Введите имя файла", Toast.LENGTH_SHORT).show()
+//                    return@setPositiveButton
+//                }
+//
+//                val csvFile = File(context.filesDir, "$fileName.csv")
+//                try {
+//                    FileWriter(csvFile).use { writer ->
+//                        writer.appendLine("№;name;author;album;isFavorite")
+//                        for ((index, song) in allSongs.withIndex()) {
+//                            writer.appendLine("${index + 1};${song.title};${song.artist};${song.album};${song.isFavorite}")
+//                        }
+//                    }
+//                    Toast.makeText(context, "Данные успешно сохранены в $fileName.csv", Toast.LENGTH_SHORT).show()
+//                } catch (e: IOException) {
+//                    Log.e("CSV Writer", "Error writing CSV file", e)
+//                    Toast.makeText(context, "Ошибка при сохранении файла", Toast.LENGTH_SHORT).show()
+//                }
+//            }
+//            .setNegativeButton("Отмена", null)
+//            .show()
+//    }
+
+
+
+
     fun saveDataToCSV(context: Context) {
-        val csvFile = File(context.filesDir, "music_data.csv")
-        FileWriter(csvFile).use { writer ->
-            writer.appendLine("№;name;author;album;isFavorite")
-            for ((index, song) in allSongs.withIndex()) {
-                writer.appendLine("${index + 1};${song.title};${song.artist};${song.album};${song.isFavorite}")
+        val builder = AlertDialog.Builder(context)
+        val input = EditText(context)
+        input.inputType = InputType.TYPE_CLASS_TEXT
+        input.hint = "Введите имя файла"
+
+        builder.setView(input)
+            .setTitle("Сохранение в CSV")
+            .setPositiveButton("Сохранить") { _, _ ->
+                val fileName = input.text.toString().trim()
+                if (fileName.isEmpty()) {
+                    Toast.makeText(context, "Введите имя файла", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                val csvFile = File(context.filesDir, "$fileName.csv")
+                if (csvFile.exists()) {
+                    AlertDialog.Builder(context)
+                        .setTitle("Файл уже существует")
+                        .setMessage("Файл '$fileName.csv' уже существует. Перезаписать?")
+                        .setPositiveButton("Да") { _, _ ->
+                            saveFile(context, csvFile, fileName)
+                        }
+                        .setNegativeButton("Нет", null)
+                        .show()
+                } else {
+                    saveFile(context, csvFile, fileName)
+                }
             }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+
+    private fun saveFile(context: Context, csvFile: File, fileName: String) {
+        try {
+            FileWriter(csvFile).use { writer ->
+                writer.appendLine("№;name;author;album;isFavorite")
+                for ((index, song) in allSongs.withIndex()) {
+                    writer.appendLine("${index + 1};${song.title};${song.artist};${song.album};${song.isFavorite}")
+                }
+            }
+            Toast.makeText(context, "Данные успешно сохранены в $fileName.csv", Toast.LENGTH_SHORT).show()
+        } catch (e: IOException) {
+            Log.e("CSV Writer", "Error writing CSV file", e)
+            Toast.makeText(context, "Ошибка при сохранении файла", Toast.LENGTH_SHORT).show()
         }
     }
+
+    private val REQUEST_CODE_SELECT_FILE = 1
+
+//    fun openCSVFile(context: Context) {
+//        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+//            addCategory(Intent.CATEGORY_OPENABLE)
+//            type = "text/csv"
+//        }
+//        (context as? Activity)?.startActivityForResult(intent, REQUEST_CODE_SELECT_FILE)
+//    }
+
+    fun openCSVFile(context: Context) {
+        val csvFile = File(context.filesDir, "music_data.csv")
+        if (csvFile.exists()) {
+            BufferedReader(FileReader(csvFile)).use { reader ->
+                reader.readLine()
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    val data = line!!.split(";")
+                    if (data.size == 5) {
+                        val index = data[0].toInt() // №
+                        val title = data[1] // name
+                        val artist = data[2] // author
+                        val album = data[3] // album
+                        val isFavorite = data[4].toBoolean() // isFavorite
+
+                        val song = Song(title, artist, album, isFavorite)
+                        allSongs.add(song)
+                    }
+                }
+            }
+            songAdapter.updateSongs(allSongs)
+        }
+    }
+
+
+
+
 
     fun saveToPDF(context: Context) {
 
     }
-
-//    fun saveToSharedPreferences(context: Context) {
-//
-//    }
-
-
-
-    fun saveToSharedPreferences(context: Context) {
-        val sharedPreferences = context.getSharedPreferences("MusicData", Context.MODE_PRIVATE)
-        val gson = Gson()
-        val allSongsJson = gson.toJson(allSongs)
-        val albumsJson = gson.toJson(albums)
-        val artistsJson = gson.toJson(artists)
-        val favoritesJson = gson.toJson(favorites)
-
-        with (sharedPreferences.edit()) {
-            putString("allSongs", allSongsJson)
-            putString("albums", albumsJson)
-            putString("artists", artistsJson)
-            putString("favorites", favoritesJson)
-            apply()
-        }
-        Toast.makeText(context, "Данные сохранены в Shared Preferences", Toast.LENGTH_SHORT).show()
-    }
-
-
-//    private fun loadDataFromSharedPreferences(context: Context) {
-//        val sharedPreferences = context.getSharedPreferences("MusicData", Context.MODE_PRIVATE)
-//        val gson = Gson()
-//        val typeAllSongs = object : TypeToken<MutableList<Song>>() {}.type
-//        val typeAlbums = object : TypeToken<MutableList<Album>>() {}.type
-//        val typeArtists = object : TypeToken<MutableList<Artist>>() {}.type
-//        val typeFavorites = object : TypeToken<MutableList<Song>>() {}.type
-//
-//
-//        allSongs = gson.fromJson(sharedPreferences.getString("allSongs", "[]"), typeAllSongs) ?: mutableListOf()
-//        albums = gson.fromJson(sharedPreferences.getString("albums", "[]"), typeAlbums) ?: mutableListOf()
-//        artists = gson.fromJson(sharedPreferences.getString("artists", "[]"), typeArtists) ?: mutableListOf()
-//        favorites = gson.fromJson(sharedPreferences.getString("favorites", "[]"), typeFavorites) ?: mutableListOf()
-//
-//        songAdapter.updateSongs(allSongs)
-//    }
-
-
 
     private fun showAllSongs() {
         val intent = Intent(this, AllSongsActivity::class.java)
@@ -247,16 +347,62 @@ class MainActivity : AppCompatActivity() {
 
 
 
+//    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+//        super.onActivityResult(requestCode, resultCode, data)
+//        if (requestCode == ALL_SONGS_REQUEST_CODE && resultCode == RESULT_OK) {
+//            val bundle = data?.extras
+//            allSongs = bundle?.getSerializable("allSongs") as? MutableList<Song> ?: mutableListOf()
+//            albums = bundle?.getSerializable("albums") as? MutableList<Album> ?: mutableListOf()
+//            artists = bundle?.getSerializable("artists") as? MutableList<Artist> ?: mutableListOf()
+//            favorites = bundle?.getSerializable("favorites") as? MutableList<Song> ?: mutableListOf()
+//
+//            songAdapter.updateSongs(allSongs)
+//        }
+//    }
+
+    // Этот код должен быть в Activity или Fragment, где вызывается openCSVFile
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == ALL_SONGS_REQUEST_CODE && resultCode == RESULT_OK) {
-            val bundle = data?.extras
-            allSongs = bundle?.getSerializable("allSongs") as? MutableList<Song> ?: mutableListOf()
-            albums = bundle?.getSerializable("albums") as? MutableList<Album> ?: mutableListOf()
-            artists = bundle?.getSerializable("artists") as? MutableList<Artist> ?: mutableListOf()
-            favorites = bundle?.getSerializable("favorites") as? MutableList<Song> ?: mutableListOf()
+        if (requestCode == REQUEST_CODE_SELECT_FILE && resultCode == Activity.RESULT_OK) {
+            data?.data?.let { uri ->
+                try {
+                    this.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        val reader = BufferedReader(InputStreamReader(inputStream))
+                        // Пропускаем заголовок, если он есть
+                        reader.readLine()
 
-            songAdapter.updateSongs(allSongs)
+                        allSongs.clear() // Очищаем список перед загрузкой новых данных
+
+                        var line: String?
+                        while (reader.readLine().also { line = it } != null) {
+                            val data = line?.split(";") ?: continue // Пропускаем пустые строки
+
+                            if (data.size == 5) {
+                                try {
+                                    val index = data[0].toInt()
+                                    val title = data[1]
+                                    val artist = data[2]
+                                    val album = data[3]
+                                    val isFavorite = data[4].toBooleanStrictOrNull() ?: false // Обработка ошибок при парсинге Boolean
+
+                                    val song = Song(title, artist, album, isFavorite)
+                                    allSongs.add(song)
+                                } catch (e: NumberFormatException) {
+                                    Log.w("CSVReader", "Error parsing line: $line", e)
+                                } catch (e: Exception) {
+                                    Log.w("CSVReader", "Error parsing line: $line", e)
+                                }
+                            } else {
+                                Log.w("CSVReader", "Invalid number of columns in line: $line")
+                            }
+                        }
+                    }
+                    songAdapter.updateSongs(allSongs)
+                } catch (e: IOException) {
+                    Log.e("CSVReader", "Error reading CSV file", e)
+                    Toast.makeText(this, "Ошибка при чтении файла", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
