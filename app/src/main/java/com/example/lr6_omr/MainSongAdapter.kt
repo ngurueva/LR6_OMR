@@ -7,9 +7,7 @@ import android.widget.CheckBox
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
-class MainSongAdapter(private val songList: MutableList<Song>) : RecyclerView.Adapter<MainSongAdapter.ViewHolder>() {
-
-    class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+class MainSongAdapter(private val songs: MutableList<Song>) : RecyclerView.Adapter<MainSongAdapter.ViewHolder>() {    class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val titleTextView: TextView = itemView.findViewById(R.id.songTitle)
         val artistTextView: TextView = itemView.findViewById(R.id.songArtist)
         val albumTextView: TextView = itemView.findViewById(R.id.songAlbum)
@@ -22,19 +20,19 @@ class MainSongAdapter(private val songList: MutableList<Song>) : RecyclerView.Ad
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val song = songList[position]
+        val song = songs[position]
         holder.titleTextView.text = song.title
         holder.artistTextView.text = song.artist
         holder.albumTextView.text = song.album
         holder.favoriteCheckBox.isChecked = song.isFavorite
-
+//        holder.itemView.setOnClickListener { onSongClickListener(song) }
     }
 
-    override fun getItemCount(): Int = songList.size
+    override fun getItemCount(): Int = songs.size
 
-    fun updateSongList(newSongList: MutableList<Song>){
-        songList.clear()
-        songList.addAll(newSongList)
+    fun updateData(newSongs: MutableList<Song>){
+        songs.clear()
+        songs.addAll(newSongs)
         notifyDataSetChanged()
     }
 }

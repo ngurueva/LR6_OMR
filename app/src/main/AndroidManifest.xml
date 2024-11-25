@@ -13,6 +13,15 @@
         android:theme="@style/Theme.LR6_OMR"
         tools:targetApi="31">
         <activity
+            android:name=".ArtistsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".AlbumsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".FavoritesActivity"
+            android:exported="false" />
+        <activity
             android:name=".AllSongsActivity"
             android:exported="false" />
         <activity

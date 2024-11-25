@@ -16,14 +16,14 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize">
-
             <TextView
                 android:id="@+id/textViewTitle"
-                android:layout_width="wrap_content"
+                android:layout_width="376dp"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
+                android:layout_alignParentTop="true"
+                android:layout_marginTop="16dp"
                 android:fontFamily="@font/rubik_mono_one"
-                android:text="Все песни"
+                android:text="Альбомы"
                 android:textAlignment="center"
                 android:textColor="#0C3B2E"
                 android:textSize="20sp"
@@ -31,12 +31,9 @@
         </com.google.android.material.appbar.MaterialToolbar>
     </com.google.android.material.appbar.AppBarLayout>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerViewAllSongs"
+    <ListView
+        android:id="@+id/listViewAlbums"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="#F6F2EF"
-        android:orientation="horizontal"
-        android:padding="8dp"
-        android:scrollbars="horizontal" />
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 </LinearLayout>
