@@ -1,7 +1,6 @@
 package com.example.lr6_omr
 
 import android.os.Bundle
-import android.view.Menu
 import android.view.MenuItem
 import android.widget.ArrayAdapter
 import android.widget.ListView
@@ -12,7 +11,7 @@ import androidx.core.view.WindowInsetsCompat
 
 class FavoritesActivity : AppCompatActivity() {
     private lateinit var favoritesAdapter: ArrayAdapter<Song>
-    private lateinit var listViewFavorites: ListView // Declare the ListView
+    private lateinit var listViewFavorites: ListView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

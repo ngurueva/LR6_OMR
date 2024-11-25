@@ -5,24 +5,28 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <TextView
-        android:id="@+id/textViewTitle"
+    <EditText
+        android:id="@+id/editTextTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textStyle="bold"
-        android:textSize="18sp" />
+        android:hint="Название" />
 
-    <TextView
-        android:id="@+id/textViewArtist"
+    <EditText
+        android:id="@+id/editTextArtist"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="16sp" />
+        android:hint="Исполнитель" />
 
-    <TextView
-        android:id="@+id/textViewAlbum"
+    <EditText
+        android:id="@+id/editTextAlbum"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="16sp" />
+        android:hint="Альбом" />
+
+    <CheckBox
+        android:id="@+id/checkBoxFavorite"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Избранное" />
 
 </LinearLayout>
-
