@@ -130,9 +130,37 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/btnSaveCSV"
+        android:layout_marginTop="2dp"
         android:clickable="true"
         android:fontFamily="@font/rubik_mono_one"
         android:text="Открыть .csv"
+        android:textAllCaps="true"
+        android:textColor="#FFFFFF"
+        android:textColorLink="#000000"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/btnSavePDF"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/btnOpenCSV"
+        android:clickable="true"
+        android:fontFamily="@font/rubik_mono_one"
+        android:text="Сохранить .PDF"
+        android:textAllCaps="true"
+        android:textColor="#FFFFFF"
+        android:textColorLink="#000000"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/btnOpenPDF"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/btnSavePDF"
+        android:layout_marginTop="2dp"
+        android:clickable="true"
+        android:fontFamily="@font/rubik_mono_one"
+        android:text="Открыть .PDF"
         android:textAllCaps="true"
         android:textColor="#FFFFFF"
         android:textColorLink="#000000"
