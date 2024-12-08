@@ -314,49 +314,6 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(context, "PDF сохранен в ${file.absolutePath}", Toast.LENGTH_LONG).show()
     }
 
-
-//    private fun saveToPDF(context: Context, onPdfCreated: (String) -> Unit){ //измененная функция
-//        try {
-//            val filePath = savePdfToInternalStorage(context, "data")
-//            onPdfCreated(filePath)
-//        } catch (e: IOException) {
-//            Toast.makeText(context, "Ошибка при сохранении PDF: ${e.message}", Toast.LENGTH_LONG).show()
-//        }
-//    }
-//
-//    @Throws(IOException::class)
-//    private fun savePdfToInternalStorage(context: Context, fileName: String) {
-//        val pdfDocument = PdfDocument()
-//        val paint = Paint()
-//        paint.setTypeface(Typeface.DEFAULT)
-//        paint.setTextSize(12f)
-//
-//        val pageInfo = PageInfo.Builder(595, 842, 1).create()
-//        val page = pdfDocument.startPage(pageInfo)
-//        val canvas = page.canvas
-//
-//        var y = 50f
-//        for ((index, song) in allSongs.withIndex()) {
-//            canvas.drawText("Название: ${song.title}", 50f, y, paint)
-//            y += 20f
-//            canvas.drawText("Исполнитель: ${song.artist}", 50f, y, paint)
-//            y += 20f
-//            canvas.drawText("Альбом: ${song.album}", 50f, y, paint)
-//            y += 20f
-//            canvas.drawText("Избранное: ${song.isFavorite}", 50f, y, paint)
-//            y += 40f
-//        }
-//        pdfDocument.finishPage(page)
-//
-//        val file = File(context.filesDir, "$fileName.pdf")
-//        if (file.exists()) file.delete()
-//        pdfDocument.writeTo(FileOutputStream(file))
-//        pdfDocument.close()
-//
-//        Toast.makeText(context, "PDF сохранен в ${file.absolutePath}", Toast.LENGTH_LONG).show()
-//        return file.absolutePath
-//    }
-
     fun openPdf(context: Context, fileName: String) {
         val file = File(context.filesDir, "$fileName.pdf")
         if (!file.exists()) {
@@ -489,6 +446,7 @@ class MainActivity : AppCompatActivity() {
 //        }
 //        return songs
 //    }
+
 
 
 
