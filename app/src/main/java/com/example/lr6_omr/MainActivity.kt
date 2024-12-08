@@ -1,20 +1,23 @@
 package com.example.lr6_omr
 
-import android.app.Activity
+
 import android.app.AlertDialog
 import android.content.ContentValues
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfDocument.PageInfo
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.text.InputType
 import android.util.Log
@@ -36,13 +39,13 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import java.io.BufferedReader
+import java.io.BufferedWriter
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.FileOutputStream
-import java.io.FileReader
 import java.io.IOException
-import java.io.InputStreamReader
 import java.io.OutputStream
+import java.io.OutputStreamWriter
 import java.io.Serializable
 
 
@@ -51,8 +54,6 @@ class MainActivity : AppCompatActivity() {
     var favorites = mutableListOf<Song>()
     var albums = mutableListOf<Album>()
     var artists = mutableListOf<Artist>()
-    val ALL_SONGS_REQUEST_CODE = 100
-    private val REQUEST_CODE_SELECT_FILE = 1
     private lateinit var recyclerView: RecyclerView
     private lateinit var songAdapter: SongAdapter
 
@@ -68,13 +69,13 @@ class MainActivity : AppCompatActivity() {
         buttonSaveCSV.setOnClickListener { saveDataToCSV(this) }
 
         val buttonOpenCSV = findViewById<Button>(R.id.btnOpenCSV)
-        buttonOpenCSV.setOnClickListener { openCSVFile(this) }
+        buttonOpenCSV.setOnClickListener { readDataFromCSV(this) }
 
         val buttonSavePDF = findViewById<Button>(R.id.btnSavePDF)
         buttonSavePDF.setOnClickListener { saveToPDF(this) }
 
         val buttonOpenPDF = findViewById<Button>(R.id.btnOpenPDF)
-        buttonOpenPDF.setOnClickListener { openAndDisplayPdfData(this) }
+        buttonOpenPDF.setOnClickListener { openPdf(this, "ff") }
 
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -141,8 +142,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveData() {
         saveDataToCSV(this)
-        saveToPDF(this)
-//        saveToSharedPreferences(this)
+//        saveToPDF(this)
     }
 
     fun saveDataToCSV(context: Context) {
@@ -192,59 +192,87 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveToOutputStream(outputStream: OutputStream, fileName: String) {
-        outputStream.use { writer ->
-            writer.write("№;name;author;album;isFavorite\n".toByteArray())
+        BufferedWriter(OutputStreamWriter(outputStream, Charsets.UTF_8)).use { writer ->
+            writer.write("№;name;author;album;isFavorite\n")
             for ((index, song) in allSongs.withIndex()) {
-                writer.write("${index + 1};${song.title};${song.artist};${song.album};${song.isFavorite}\n".toByteArray())
+                writer.write("${index + 1};${song.title};${song.artist};${song.album};${song.isFavorite}\n")
             }
         }
     }
-    private val PICK_CSV_FILE = 1
 
-    fun openCSVFile(activity: Activity) {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "text/csv"
-        }
-        activity.startActivityForResult(intent, PICK_CSV_FILE)
+    fun readDataFromCSV(context: Context): List<Song> {
+        val allSongs = mutableListOf<Song>()
+        val builder = AlertDialog.Builder(context)
+        val input = EditText(context)
+        input.inputType = InputType.TYPE_CLASS_TEXT
+        input.hint = "Введите имя файла (без расширения .csv)"
+
+        builder.setView(input)
+            .setTitle("Чтение из CSV")
+            .setPositiveButton("Читать") { _, _ ->
+                val fileName = input.text.toString().trim()
+                if (fileName.isEmpty()) {
+                    Toast.makeText(context, "Введите имя файла", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val songs = readCSV(context, fileName)
+                allSongs.addAll(songs)
+                songAdapter.updateSongs(allSongs)
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+        return allSongs
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == PICK_CSV_FILE && resultCode == Activity.RESULT_OK) {
-            data?.data?.let { uri ->
-                try {
-                    contentResolver.openInputStream(uri)?.use { inputStream ->
-                        val reader = BufferedReader(InputStreamReader(inputStream))
-                        var line: String?
-                        val allSongs = mutableListOf<Song>()
-                        reader.readLine()
-                        while (reader.readLine().also { line = it } != null) {
-                            val data = line!!.split(";")
-                            if (data.size == 5) {
+
+    private fun readCSV(context: Context, fileName: String): List<Song> {
+        val songList = mutableListOf<Song>()
+        val resolver = context.contentResolver
+        val uri = MediaStore.Files.getContentUri("external")
+        val selection = MediaStore.MediaColumns.DISPLAY_NAME + " = ?"
+        val selectionArgs = arrayOf("$fileName.csv")
+        val projection = arrayOf(MediaStore.MediaColumns.DATA)
+
+        try {
+            resolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val filePath = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA))
+                    File(filePath).useLines { lines ->
+                        lines.drop(1).forEach { line ->
+                            val parts = line.split(';')
+                            if (parts.size == 5) {
                                 try {
-                                    val index = data[0].toInt()
-                                    val title = data[1]
-                                    val artist = data[2]
-                                    val album = data[3]
-                                    val isFavorite = data[4].toBoolean()
-                                    val song = Song(title, artist, album, isFavorite)
-                                    allSongs.add(song)
-                                } catch (e: NumberFormatException) {
-                                    Log.e("CSV_PARSER", "Ошибка парсинга строки: $line", e)
+                                    val song = Song(parts[1], parts[2], parts[3], parts[4].toBoolean())
+                                    songList.add(song)
+                                    Log.d("Song", song.toString())
                                 } catch (e: Exception) {
-                                    Log.e("CSV_PARSER", "Общая ошибка парсинга строки: $line", e)
+                                    Log.e("readDataFromCSV", "Error parsing line: $line", e)
                                 }
+                            } else {
+                                Log.w("readDataFromCSV", "Incorrect number of elements in line: $line")
                             }
                         }
-                        songAdapter.updateSongs(allSongs)
                     }
-                } catch (e: Exception) {
-                    Toast.makeText(this, "Ошибка при чтении файла: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
+        } catch (e: SecurityException) {
+            Log.e("readDataFromCSV", "SecurityException: Insufficient permissions", e)
+            Toast.makeText(context, "Недостаточно прав для доступа к файлу", Toast.LENGTH_SHORT).show()
+        } catch (e: FileNotFoundException) {
+            Log.e("readDataFromCSV", "FileNotFoundException: File not found", e)
+            Toast.makeText(context, "Файл не найден", Toast.LENGTH_SHORT).show()
+        } catch (e: IOException) {
+            Log.e("readDataFromCSV", "IOException: Error reading file", e)
+            Toast.makeText(context, "Ошибка чтения файла", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e("readDataFromCSV", "Unexpected error", e)
+            Toast.makeText(context, "Произошла неизвестная ошибка", Toast.LENGTH_SHORT).show()
         }
+        return songList
     }
+
+
+
 
     fun saveToPDF(context: Context) {
         try {
@@ -285,61 +313,194 @@ class MainActivity : AppCompatActivity() {
 
         Toast.makeText(context, "PDF сохранен в ${file.absolutePath}", Toast.LENGTH_LONG).show()
     }
-    fun openAndDisplayPdfData(context: Context) {
-        val pdfFile = File(context.filesDir, "data.pdf")
-        if (pdfFile.exists()) {
-            try {
-                val parser = SimplePdfParser()
-                val extractedText = parser.extractText(pdfFile)
 
-                val newSongs = parseTextToSongs(extractedText)
-                Log.e("TITLE", newSongs[0].title.toString())
-                allSongs = newSongs
-                songAdapter.updateSongs(allSongs)
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error processing PDF: ${e.message}", Toast.LENGTH_LONG).show()
-                Log.e("PDF_PROCESSING", "Error: ", e)
-            }
-        } else {
-            Toast.makeText(context, "PDF file not found.", Toast.LENGTH_SHORT).show()
+
+//    private fun saveToPDF(context: Context, onPdfCreated: (String) -> Unit){ //измененная функция
+//        try {
+//            val filePath = savePdfToInternalStorage(context, "data")
+//            onPdfCreated(filePath)
+//        } catch (e: IOException) {
+//            Toast.makeText(context, "Ошибка при сохранении PDF: ${e.message}", Toast.LENGTH_LONG).show()
+//        }
+//    }
+//
+//    @Throws(IOException::class)
+//    private fun savePdfToInternalStorage(context: Context, fileName: String) {
+//        val pdfDocument = PdfDocument()
+//        val paint = Paint()
+//        paint.setTypeface(Typeface.DEFAULT)
+//        paint.setTextSize(12f)
+//
+//        val pageInfo = PageInfo.Builder(595, 842, 1).create()
+//        val page = pdfDocument.startPage(pageInfo)
+//        val canvas = page.canvas
+//
+//        var y = 50f
+//        for ((index, song) in allSongs.withIndex()) {
+//            canvas.drawText("Название: ${song.title}", 50f, y, paint)
+//            y += 20f
+//            canvas.drawText("Исполнитель: ${song.artist}", 50f, y, paint)
+//            y += 20f
+//            canvas.drawText("Альбом: ${song.album}", 50f, y, paint)
+//            y += 20f
+//            canvas.drawText("Избранное: ${song.isFavorite}", 50f, y, paint)
+//            y += 40f
+//        }
+//        pdfDocument.finishPage(page)
+//
+//        val file = File(context.filesDir, "$fileName.pdf")
+//        if (file.exists()) file.delete()
+//        pdfDocument.writeTo(FileOutputStream(file))
+//        pdfDocument.close()
+//
+//        Toast.makeText(context, "PDF сохранен в ${file.absolutePath}", Toast.LENGTH_LONG).show()
+//        return file.absolutePath
+//    }
+
+    fun openPdf(context: Context, fileName: String) {
+        val file = File(context.filesDir, "$fileName.pdf")
+        if (!file.exists()) {
+            Toast.makeText(context, "Файл не найден", Toast.LENGTH_SHORT).show()
+            return
         }
+
+        val fileDescriptor: ParcelFileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        val pdfRenderer = PdfRenderer(fileDescriptor)
+
+        // Получаем первую страницу PDF
+        val page = pdfRenderer.openPage(0)
+
+        // Создаем Bitmap для отображения страницы
+        val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
+
+        // Рисуем страницу на Bitmap
+        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
+        // Закрываем страницу и PdfRenderer
+        page.close()
+        pdfRenderer.close()
     }
 
+//
+//
+//    fun readDataFromPDF(context: Context): List<Song> {
+//        val songList = mutableListOf<Song>()
+//        val file = File(context.filesDir, "data.pdf") // Замените "data.pdf" на ваше имя файла
+//
+//        if (file.exists()) {
+//            try {
+//                val reader = PdfReader(file)
+//                val pdfDocument = PdfDocument(reader)
+//                val numPages = pdfDocument.numberOfPages
+//
+//                for (i in 1..numPages) {
+//                    val page = pdfDocument.getPage(i)
+//                    val text = page.getPdfObject().getAsString(PdfName.CONTENTS) // Экстрагируем текст.  Это может быть неточным для сложного форматирования
+//
+//                    if (text != null) {
+//                        extractSongDataFromText(text.toString(), songList)
+//                    }
+//                }
+//                pdfDocument.close()
+//                reader.close()
+//            } catch (e: IOException) {
+//                Log.e("readDataFromPDF", "Error reading PDF", e)
+//            } catch (e: Exception) {
+//                Log.e("readDataFromPDF", "Error processing PDF", e)
+//            }
+//        } else {
+//            Log.w("readDataFromPDF", "PDF file not found")
+//        }
+//
+//        return songList
+//    }
 
-    fun parseTextToSongs(text: String): MutableList<Song> {
-        val songs = mutableListOf<Song>()
+
+
+    private fun extractSongDataFromText(text: String, songList: MutableList<Song>) {
+        // Это упрощенное решение - нужно улучшить для обработки ошибок и различных форматов
         val lines = text.lines()
-        var currentSong: Song? = null
+        var i = 0
+        while (i < lines.size) {
+            val title = lines[i].substringAfter("Название: ").trim()
+            val artist = lines[i + 1].substringAfter("Исполнитель: ").trim()
+            val album = lines[i + 2].substringAfter("Альбом: ").trim()
+            val isFavorite = lines[i + 3].substringAfter("Избранное: ").trim().toBoolean()
 
-        for (line in lines) {
-            if (line.contains(":")) {
-                val parts = line.split(": ")
-                if (parts.size == 2) {
-                    val key = parts[0].trim()
-                    val value = parts[1].trim()
-
-//                    Log.i("SONG_DATA", "key: ${key}")
-//                    Log.i("SONG_DATA", "value: ${value}")
-
-                    when (key) {
-                        "Название" -> if (currentSong != null) currentSong.title = value
-                        "Исполнитель" -> if (currentSong != null) currentSong.artist = value
-                        "Альбом" -> if (currentSong != null) currentSong.album = value
-                        "Избранное" -> if (currentSong != null) currentSong.isFavorite = value.toBooleanStrict()
-
-                    }
-
-
-
-                    if (currentSong != null && currentSong.title.isNotEmpty()) {
-                        songs.add(currentSong!!)
-                        currentSong = null
-                    }
-                }
-            }
+            songList.add(Song(title, artist, album, isFavorite))
+            i += 4
         }
-        return songs
     }
+
+
+
+//    fun openAndDisplayPdfData(context: Context) {
+//        val pdfFile = File(context.filesDir, "data.pdf")
+//        if (pdfFile.exists()) {
+//            try {
+//                val parser = SimplePdfParser()
+//                val extractedText = parser.extractText(pdfFile)
+//
+//                val newSongs = parseTextToSongs(extractedText)
+//                Log.e("TITLE", newSongs[0].title.toString())
+//                allSongs = newSongs
+//                songAdapter.updateSongs(allSongs)
+//            } catch (e: Exception) {
+//                Toast.makeText(context, "Error processing PDF: ${e.message}", Toast.LENGTH_LONG).show()
+//                Log.e("PDF_PROCESSING", "Error: ", e)
+//            }
+//        } else {
+//            Toast.makeText(context, "PDF file not found.", Toast.LENGTH_SHORT).show()
+//        }
+//    }
+//
+//
+//    fun parseTextToSongs(text: String): MutableList<Song> {
+//        val songs = mutableListOf<Song>()
+//        val lines = text.lines()
+//        var currentSong: Song? = null
+//
+//        for (line in lines) {
+//            if (line.contains(":")) {
+//                val parts = line.split(": ")
+//                if (parts.size == 2) {
+//                    val key = parts[0].trim()
+//                    val value = parts[1].trim()
+//
+////                    Log.i("SONG_DATA", "key: ${key}")
+////                    Log.i("SONG_DATA", "value: ${value}")
+//
+//                    when (key) {
+//                        "Название" -> if (currentSong != null) currentSong.title = value
+//                        "Исполнитель" -> if (currentSong != null) currentSong.artist = value
+//                        "Альбом" -> if (currentSong != null) currentSong.album = value
+//                        "Избранное" -> if (currentSong != null) currentSong.isFavorite = value.toBooleanStrict()
+//
+//                    }
+//
+//
+//
+//                    if (currentSong != null && currentSong.title.isNotEmpty()) {
+//                        songs.add(currentSong!!)
+//                        currentSong = null
+//                    }
+//                }
+//            }
+//        }
+//        return songs
+//    }
+
+
+
+
+
+
+
+
+
+
+
+
 //
 //    fun openPDFFile(activity: Activity) {
 //        openPdfFromInternalStorage(activity, "data")
