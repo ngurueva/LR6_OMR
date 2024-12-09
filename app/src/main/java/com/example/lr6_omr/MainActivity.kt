@@ -6,18 +6,15 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
-import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfDocument.PageInfo
-import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.text.InputType
 import android.util.Log
@@ -49,6 +46,11 @@ import java.io.OutputStreamWriter
 import java.io.Serializable
 
 
+import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
+import androidx.core.content.FileProvider
+
+
 class MainActivity : AppCompatActivity() {
     var allSongs = mutableListOf<Song>()
     var favorites = mutableListOf<Song>()
@@ -62,6 +64,16 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
         setSupportActionBar(findViewById(R.id.toolbar))
+
+        recyclerView = findViewById(R.id.recyclerViewMain) // Find the view AFTER setContentView
+        recyclerView.layoutManager = LinearLayoutManager(this)
+
+
+        val songStorage = SongStorage(this)
+        allSongs = songStorage.loadSongs()
+        songAdapter = SongAdapter(this, allSongs)
+        recyclerView.adapter = songAdapter
+
         val buttonAdd = findViewById<Button>(R.id.buttonAdd)
         buttonAdd.setOnClickListener { addSong() }
 
@@ -75,19 +87,13 @@ class MainActivity : AppCompatActivity() {
         buttonSavePDF.setOnClickListener { saveToPDF(this) }
 
         val buttonOpenPDF = findViewById<Button>(R.id.btnOpenPDF)
-        buttonOpenPDF.setOnClickListener { openPdf(this, "ff") }
-
+        buttonOpenPDF.setOnClickListener { openPdfFile(this, "data") }
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
-
-        recyclerView = findViewById(R.id.recyclerViewMain)
-        recyclerView.layoutManager = LinearLayoutManager(this)
-        songAdapter = SongAdapter(this, allSongs)
-        recyclerView.adapter = songAdapter
 
 
         val itemTouchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
@@ -109,6 +115,16 @@ class MainActivity : AppCompatActivity() {
             }
         })
         itemTouchHelper.attachToRecyclerView(recyclerView)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        saveSongsToStorage()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        saveSongsToStorage()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -314,171 +330,30 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(context, "PDF сохранен в ${file.absolutePath}", Toast.LENGTH_LONG).show()
     }
 
-    fun openPdf(context: Context, fileName: String) {
+
+
+
+    private fun openPdfFile(context: Context, fileName: String) {
         val file = File(context.filesDir, "$fileName.pdf")
         if (!file.exists()) {
             Toast.makeText(context, "Файл не найден", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val fileDescriptor: ParcelFileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-        val pdfRenderer = PdfRenderer(fileDescriptor)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file) //Requires adding FileProvider to manifest
 
-        // Получаем первую страницу PDF
-        val page = pdfRenderer.openPage(0)
+        val intent = Intent(Intent.ACTION_VIEW)
+        intent.setDataAndType(uri, "application/pdf")
+        intent.flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) //Needed for starting activity from service
 
-        // Создаем Bitmap для отображения страницы
-        val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
-
-        // Рисуем страницу на Bitmap
-        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-
-        // Закрываем страницу и PdfRenderer
-        page.close()
-        pdfRenderer.close()
-    }
-
-//
-//
-//    fun readDataFromPDF(context: Context): List<Song> {
-//        val songList = mutableListOf<Song>()
-//        val file = File(context.filesDir, "data.pdf") // Замените "data.pdf" на ваше имя файла
-//
-//        if (file.exists()) {
-//            try {
-//                val reader = PdfReader(file)
-//                val pdfDocument = PdfDocument(reader)
-//                val numPages = pdfDocument.numberOfPages
-//
-//                for (i in 1..numPages) {
-//                    val page = pdfDocument.getPage(i)
-//                    val text = page.getPdfObject().getAsString(PdfName.CONTENTS) // Экстрагируем текст.  Это может быть неточным для сложного форматирования
-//
-//                    if (text != null) {
-//                        extractSongDataFromText(text.toString(), songList)
-//                    }
-//                }
-//                pdfDocument.close()
-//                reader.close()
-//            } catch (e: IOException) {
-//                Log.e("readDataFromPDF", "Error reading PDF", e)
-//            } catch (e: Exception) {
-//                Log.e("readDataFromPDF", "Error processing PDF", e)
-//            }
-//        } else {
-//            Log.w("readDataFromPDF", "PDF file not found")
-//        }
-//
-//        return songList
-//    }
-
-
-
-    private fun extractSongDataFromText(text: String, songList: MutableList<Song>) {
-        // Это упрощенное решение - нужно улучшить для обработки ошибок и различных форматов
-        val lines = text.lines()
-        var i = 0
-        while (i < lines.size) {
-            val title = lines[i].substringAfter("Название: ").trim()
-            val artist = lines[i + 1].substringAfter("Исполнитель: ").trim()
-            val album = lines[i + 2].substringAfter("Альбом: ").trim()
-            val isFavorite = lines[i + 3].substringAfter("Избранное: ").trim().toBoolean()
-
-            songList.add(Song(title, artist, album, isFavorite))
-            i += 4
+        try {
+            context.startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(context, "Нет приложения для открытия PDF", Toast.LENGTH_SHORT).show()
         }
     }
 
-
-
-//    fun openAndDisplayPdfData(context: Context) {
-//        val pdfFile = File(context.filesDir, "data.pdf")
-//        if (pdfFile.exists()) {
-//            try {
-//                val parser = SimplePdfParser()
-//                val extractedText = parser.extractText(pdfFile)
-//
-//                val newSongs = parseTextToSongs(extractedText)
-//                Log.e("TITLE", newSongs[0].title.toString())
-//                allSongs = newSongs
-//                songAdapter.updateSongs(allSongs)
-//            } catch (e: Exception) {
-//                Toast.makeText(context, "Error processing PDF: ${e.message}", Toast.LENGTH_LONG).show()
-//                Log.e("PDF_PROCESSING", "Error: ", e)
-//            }
-//        } else {
-//            Toast.makeText(context, "PDF file not found.", Toast.LENGTH_SHORT).show()
-//        }
-//    }
-//
-//
-//    fun parseTextToSongs(text: String): MutableList<Song> {
-//        val songs = mutableListOf<Song>()
-//        val lines = text.lines()
-//        var currentSong: Song? = null
-//
-//        for (line in lines) {
-//            if (line.contains(":")) {
-//                val parts = line.split(": ")
-//                if (parts.size == 2) {
-//                    val key = parts[0].trim()
-//                    val value = parts[1].trim()
-//
-////                    Log.i("SONG_DATA", "key: ${key}")
-////                    Log.i("SONG_DATA", "value: ${value}")
-//
-//                    when (key) {
-//                        "Название" -> if (currentSong != null) currentSong.title = value
-//                        "Исполнитель" -> if (currentSong != null) currentSong.artist = value
-//                        "Альбом" -> if (currentSong != null) currentSong.album = value
-//                        "Избранное" -> if (currentSong != null) currentSong.isFavorite = value.toBooleanStrict()
-//
-//                    }
-//
-//
-//
-//                    if (currentSong != null && currentSong.title.isNotEmpty()) {
-//                        songs.add(currentSong!!)
-//                        currentSong = null
-//                    }
-//                }
-//            }
-//        }
-//        return songs
-//    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-//
-//    fun openPDFFile(activity: Activity) {
-//        openPdfFromInternalStorage(activity, "data")
-//    }
-//
-//    private fun openPdfFromInternalStorage(context: Context, fileName: String) {
-//        try {
-//            val file = File(context.filesDir, "$fileName.pdf")
-//            if (file.exists()) {
-//                val intent = Intent(Intent.ACTION_VIEW)
-//                intent.setDataAndType(Uri.fromFile(file), "application/pdf")
-//                intent.flags = Intent.FLAG_ACTIVITY_NO_HISTORY
-//                context.startActivity(intent)
-//            } else {
-//                Toast.makeText(context, "Файл не найден", Toast.LENGTH_SHORT).show()
-//            }
-//        } catch (e: Exception) {
-//            Toast.makeText(context, "Ошибка при открытии PDF: ${e.message}", Toast.LENGTH_LONG).show()
-//        }
-//    }
 
 
     private fun showAllSongs() {
@@ -555,6 +430,11 @@ class MainActivity : AppCompatActivity() {
         checkBoxFavorite?.isChecked = false
 
         songAdapter.updateSongs(allSongs)
+        saveSongsToStorage()
+    }
+    private fun saveSongsToStorage() {
+        val songStorage = SongStorage(this)
+        songStorage.saveSongs(allSongs)
     }
 
 
@@ -586,9 +466,6 @@ class MainActivity : AppCompatActivity() {
                 showEditSongDialog(song, position)
             }
         }
-
-
-
 
         private fun showEditSongDialog(song: Song, position: Int) {
             val builder = AlertDialog.Builder(context)
