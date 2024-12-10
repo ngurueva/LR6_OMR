@@ -1,7 +1,7 @@
 package com.example.lr6_omr
 
-
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
 import android.content.ContentValues
 import android.content.Context
 import android.content.DialogInterface
@@ -31,6 +31,7 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -44,11 +45,6 @@ import java.io.IOException
 import java.io.OutputStream
 import java.io.OutputStreamWriter
 import java.io.Serializable
-
-
-import android.content.ActivityNotFoundException
-import android.content.pm.PackageManager
-import androidx.core.content.FileProvider
 
 
 class MainActivity : AppCompatActivity() {
@@ -156,10 +152,6 @@ class MainActivity : AppCompatActivity() {
 
 
 
-    private fun saveData() {
-        saveDataToCSV(this)
-//        saveToPDF(this)
-    }
 
     fun saveDataToCSV(context: Context) {
         val builder = AlertDialog.Builder(context)
@@ -173,10 +165,9 @@ class MainActivity : AppCompatActivity() {
                 val fileName = input.text.toString().trim()
                 if (fileName.isEmpty()) {
                     Toast.makeText(context, "Введите имя файла", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
                 }
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { // Для Android 10+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     saveToMediaStore(context, fileName)
                 }
             }
@@ -289,7 +280,6 @@ class MainActivity : AppCompatActivity() {
 
 
 
-
     fun saveToPDF(context: Context) {
         try {
             savePdfToInternalStorage(context, "data")
@@ -339,14 +329,12 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(context, "Файл не найден", Toast.LENGTH_SHORT).show()
             return
         }
-
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file) //Requires adding FileProvider to manifest
 
         val intent = Intent(Intent.ACTION_VIEW)
         intent.setDataAndType(uri, "application/pdf")
         intent.flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) //Needed for starting activity from service
-
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {
             context.startActivity(intent)
         } catch (e: ActivityNotFoundException) {
@@ -354,16 +342,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-
     private fun showAllSongs() {
         val intent = Intent(this, AllSongsActivity::class.java)
         val bundle = Bundle()
         bundle.putSerializable("allSongs", allSongs as Serializable)
         intent.putExtra("allSongsBundle", bundle)
         startActivity(intent)
-
-        saveData()
     }
 
     private fun showFavorites() {
@@ -490,8 +474,7 @@ class MainActivity : AppCompatActivity() {
 
                     if (title.isEmpty() || artist.isEmpty() || album.isEmpty()) {
                         Toast.makeText(context, "Заполните все поля", Toast.LENGTH_SHORT).show()
-                        return@setPositiveButton
-                    }//Update song and refresh list
+                    }
                     val updatedSong = Song(title, artist, album, isFavorite)
                     songs[position] = updatedSong
 
@@ -503,7 +486,7 @@ class MainActivity : AppCompatActivity() {
                     notifyItemChanged(position)
 
                 }
-                .setNegativeButton("Отмена", null) // Null listener dismisses automatically
+                .setNegativeButton("Отмена", null)
                 .show()
         }
 

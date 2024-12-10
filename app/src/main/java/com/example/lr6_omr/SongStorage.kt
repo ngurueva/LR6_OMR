@@ -5,7 +5,7 @@ import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
-class SongStorage(context: Context) {
+class SongStorage(private val context: Context) {
     private val sharedPreferences: SharedPreferences = context.getSharedPreferences("song_data", Context.MODE_PRIVATE)
     private val gson = Gson()
 
@@ -20,4 +20,3 @@ class SongStorage(context: Context) {
         return gson.fromJson(json, type) ?: mutableListOf()
     }
 }
-
